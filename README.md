@@ -16,7 +16,7 @@ To set an arbitrary time on an STB via NTP:
 
 On PC:
 
-        ntpserver.py --time "2022-03-27 00:45" # 15 minutes before BST starts
+        sudo ntpserver.py --time "2022-03-27 00:45" # 15 minutes before BST starts
 
 On STB:
         
