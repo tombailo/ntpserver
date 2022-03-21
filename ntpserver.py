@@ -1,3 +1,6 @@
+#!/usr/bin/python
+
+import argparse
 import datetime
 import socket
 import struct
@@ -6,9 +9,18 @@ import Queue
 import mutex
 import threading
 import select
+import sys
+import re
+
+usage = '''Test NTP server'''
 
 taskQueue = Queue.Queue()
 stopFlag = False
+offset = 0
+
+def get_system_time():
+    global offset
+    return time.time() + offset 
 
 def system_to_ntp_time(timestamp):
     """Convert a system time to a NTP time.
@@ -160,7 +172,7 @@ class NTPPacket:
         self.tx_timestamp = tx_timestamp
         self.tx_timestamp_high = 0
         self.tx_timestamp_low = 0
-        """tansmit timestamp"""
+        """transmit timestamp"""
         
     def to_data(self):
         """Convert this NTPPacket to a buffer that can be sent over a socket.
@@ -252,7 +264,7 @@ class RecvThread(threading.Thread):
                 for tempSocket in rlist:
                     try:
                         data,addr = tempSocket.recvfrom(1024)
-                        recvTimestamp = recvTimestamp = system_to_ntp_time(time.time())
+                        recvTimestamp = recvTimestamp = system_to_ntp_time(get_system_time())
                         taskQueue.put((data,addr,recvTimestamp))
                     except socket.error,msg:
                         print msg;
@@ -284,13 +296,34 @@ class WorkThread(threading.Thread):
                 sendPacket.ref_timestamp = recvTimestamp-5
                 sendPacket.SetOriginTimeStamp(timeStamp_high,timeStamp_low)
                 sendPacket.recv_timestamp = recvTimestamp
-                sendPacket.tx_timestamp = system_to_ntp_time(time.time())
+                sendPacket.tx_timestamp = system_to_ntp_time(get_system_time())
                 socket.sendto(sendPacket.to_data(),addr)
                 print "Sended to %s:%d" % (addr[0],addr[1])
             except Queue.Empty:
                 continue
-                
-        
+
+parser = argparse.ArgumentParser(description=usage, formatter_class=argparse.RawDescriptionHelpFormatter)
+parser.add_argument('--time', nargs='?',
+        help='Initial time that should be returned by the server. "YYYY-MM-DD HH:mm" format')
+parser.add_argument('--offset', nargs='?',
+        help='Offset from now, in hours, that should be returned by the server')
+args = parser.parse_args()
+
+if args.time is not None and args.offset is not None:
+    print '--offset and --time are mutually exclusive'
+    sys.exit(1)
+
+if args.offset is not None:
+    offset = int(args.offset) * 3600
+elif args.time is not None:
+    match = re.match(r'^(\d\d\d\d)-(\d\d)-(\d\d) (\d\d):(\d\d)', args.time)
+    start_time = datetime.datetime(year=int(match.group(1)),
+            month=int(match.group(2)),
+            day=int(match.group(3)),
+            hour=int(match.group(4)),
+            minute=int(match.group(5)))
+    offset = (start_time - datetime.datetime.now()).total_seconds()
+
 listenIp = "0.0.0.0"
 listenPort = 123
 socket = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
