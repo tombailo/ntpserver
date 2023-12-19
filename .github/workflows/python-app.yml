@@ -9,6 +9,16 @@ on:
   pull_request:
     branches: [ "master" ]
 
+  workflow_dispatch:
+    inputs:
+      deployEnv:
+        description: 'Target deployment environment'
+        type: choice
+        required: true
+        options:
+         - pre01
+         - pro01
+
 permissions:
   contents: read
 
